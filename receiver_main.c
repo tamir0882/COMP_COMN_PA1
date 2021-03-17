@@ -9,44 +9,156 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "communication.h"
 #pragma comment(lib, "Ws2_32.lib")
 
-#define IN_PORT 8080
+#define PORT_INDEX 1
+#define FILE_INDEX 2
+#define ARGC_COUNT 3
 
+#define FAILURE -1 
+#define SUCCESS 0
 
-
-
+#define CHUNK_SIZE 15
 
 int main(int argc, char* argv[])
 {
+	
+	if (argc != ARGC_COUNT)
+	{
+		printf("ARGC_COUNT fault, should receive %d argumets with program execution.\n", (ARGC_COUNT - 1));
+		exit(FAILURE);
+	}
+
+	int ret_val = 0;
+	int exit_code = SUCCESS;
+\
+	int total_byte_count = 0;
+	char* file_data = NULL;
+
+	int bytes_recv = 0;
+	//char* recv_buffer = NULL;
+	char recv_buffer[15] = "";
+
+
+	unsigned long channel_ip_address = 0;
+	char str_channel_ip_address[17] = "";
+
+	unsigned int port_num = 0;
+
+	char file_name[_MAX_PATH] = "";
+	FILE* p_file = NULL;
+
+	SOCKADDR_IN sender_addr = { .sin_addr = 0, .sin_family = 0, .sin_port = 0 };
+	int sender_addr_size = sizeof(sender_addr);
+
+	SOCKADDR_IN recv_addr = { .sin_addr = 0, .sin_family = 0, .sin_port = 0 };
+	SOCKET s_recv = INVALID_SOCKET;
+
+
+
+	ret_val = snprintf(file_name, _MAX_PATH, "%s", argv[FILE_INDEX]);
+	if (0 >= ret_val)
+	{
+		printf("ERROR - snprintf for file_name - has failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+
+	port_num = (unsigned int)strtol(argv[PORT_INDEX], NULL, 10);
+	if (port_num == 0)
+	{
+		printf("ERROR - strtol for channel_port - has failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+
+	
 	// initialize windows networking
 	WSADATA wsaData;
-	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (iResult != NO_ERROR)
-		printf("Error at WSAStartup()\n");
-
-
-	SOCKADDR_IN server_addr;
-
-
-	// create the socket that will listen for incoming TCP connections
-	SOCKET s_udp_listen = socket(AF_INET, SOCK_DGRAM, 0);
-	
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = INADDR_ANY;
-	server_addr.sin_port = htons(IN_PORT);
-	
-	int status = bind(s_udp_listen, (SOCKADDR*)&server_addr, sizeof(server_addr));
-	status = listen(s_udp_listen, SOMAXCONN);
-	
-	
-	while (1)
+	ret_val = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (ret_val != NO_ERROR)
 	{
-		sscanf
-		//here need to change for udp communication
-		received = recvfrom(s, recieved_buffer, MSG_SIZE, 0);
-		if (received)
-			printf("%s", recieved_buffer);
+		printf("Error at WSAStartup()\n");
+		exit_code = FAILURE;
+		goto CleanUp;
 	}
-	return 0;
+		
+
+
+	s_recv = socket(AF_INET, SOCK_DGRAM, 0);
+	if (SOCKET_ERROR == s_recv)
+	{
+		printf("ERROR - socket creation for recv_socket - has failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+	
+
+	ret_val = inet_pton(AF_INET, "127.0.0.1", &channel_ip_address);
+	if (1 != ret_val)
+	{
+		printf("ERROR - inet_pton failed - has failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+
+
+
+	recv_addr.sin_family = AF_INET;
+	recv_addr.sin_addr.s_addr = channel_ip_address;
+	//recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	recv_addr.sin_port = htons(port_num);
+	
+
+	ret_val = bind(s_recv, (SOCKADDR*)&recv_addr, sizeof(recv_addr));
+	if (ret_val != 0) 
+	{
+		printf("bind failed with error %d\n", WSAGetLastError());
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+	
+
+	recv_buffer = (char*)malloc(sizeof(char) * CHUNK_SIZE);
+	if (NULL == recv_buffer)
+	{
+		printf("memory allocation failed for recv_buffer.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+		
+
+	bytes_recv = recv_data(recv_buffer ,s_recv, sender_addr);
+	if (FAILURE == bytes_recv)
+	{
+		printf("ERROR - recv_data failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+
+
+	printf("sender sent %s", recv_buffer);
+
+
+
+CleanUp:
+
+	if (INVALID_SOCKET != s_recv)
+	{
+		if (SOCKET_ERROR == closesocket(s_recv))
+		{
+			printf("server_main: Failed to close listen_socket, error %ld.\n", WSAGetLastError());
+		}
+	}
+
+
+	if (SOCKET_ERROR == WSACleanup())
+	{
+		printf("server_main: Failed to close Winsocket, error %ld.\n", WSAGetLastError());
+	}
+
+
+
+	return exit_code;
 }
