@@ -61,7 +61,7 @@ int send_buffer(const char* buffer, int bytes_to_send, SOCKET s_send, SOCKADDR_I
 //buffer_recv = buffer to store received data
 //buf_size = size of buffer_recv
 //SOCKET s_recv = socket of receiver
-//SOCKADDR_IN sender_addr = address of sender
+//SOCKADDR_IN *sender_addr = address of sender
 
 //for example:
 //int ret_val = 0;
@@ -76,7 +76,7 @@ int send_buffer(const char* buffer, int bytes_to_send, SOCKET s_send, SOCKADDR_I
 //sender_addr.sin_addr.s_addr = ip_address;
 //sender_addr.sin_port = htons(port_number);
 
-int recv_data(char* buffer_recv, int buf_size, SOCKET s_recv, SOCKADDR_IN sender_addr)
+int recv_data(char* buffer_recv, int buf_size, SOCKET s_recv, SOCKADDR_IN *sender_addr)
 {
 	if (NULL == buffer_recv)
 	{
