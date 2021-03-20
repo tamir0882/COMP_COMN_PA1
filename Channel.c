@@ -11,8 +11,8 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-#define FAILURE -1
-#define SUCCESS 0
+#include "communication.h"
+
 #define CHANNEL_PORT_INDEX 1
 #define RECV_IP_INDEX 2
 #define RECV_PORT_INDEX 3
@@ -42,8 +42,19 @@ int main(int argc, char* argv[])
 	unsigned int error_num = 0;
 	unsigned int prob_den = 0;
 	unsigned int i = 0;
-	char* received_buffer[15] = "";
-	
+	int bytes_recv = 0;
+	char* recv_buffer = NULL;
+	char recv_buffer[15] = "";
+	int flipped_count = 0;
+
+	recv_buffer = (char*)malloc(sizeof(char) * CHUNK_SIZE);
+	if (NULL == recv_buffer)
+	{
+		printf("memory allocation failed for recv_buffer.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+
 	ret_val = snprintf(recv_ip_address, 17, "%s", argv[RECV_IP_INDEX]);
 	if (0 >= ret_val)
 	{
@@ -118,9 +129,9 @@ int main(int argc, char* argv[])
 
 	// Create a socket to the receiver to send the operated data
 
-	SOCKET s_receiver = socket(AF_INET, SOCK_DGRAM, 0);
+	SOCKET s_recv = socket(AF_INET, SOCK_DGRAM, 0);
 
-	if (SOCKET_ERROR == s_receiver)
+	if (SOCKET_ERROR == s_recv)
 	{
 		printf("ERROR - failed to create s_sender socket - has failed.\n");
 		exit_code = FAILURE;
@@ -150,29 +161,16 @@ int main(int argc, char* argv[])
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
-	
-	received_buffer = (char*)malloc(sizeof(char) * CHUNK_SIZE);
-	if (NULL == received_buffer)
+		
+
+	bytes_recv = recv_data(recv_buffer, sizeof(recv_buffer), s_channel, sender_addr);
+	if (FAILURE == bytes_recv)
 	{
-		printf("memory allocation failed for recv_buffer.\n");
+		printf("ERROR - recv_data failed.\n");
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
 
-	ret_val = listen(s_channel, SOMAXCONN);
-
-	/* CHANNEL RECEIVES MESSAGES FROM SENDER - NEED TO BE MODIFIED
-	while (1)
-	{
-		sscanf
-			//here need to change for udp communication
-			received = recvfrom(s, recieved_buffer, MSG_SIZE, 0);
-		if (received)
-			printf("%s", recieved_buffer);
-	}
-	
-	*/
-	
 
 	prob_den = pow(BASE, POWER);
 	if (error_num >= prob_den || error_num < 0)
@@ -182,14 +180,26 @@ int main(int argc, char* argv[])
 
 	srand(rand_seed);
 	
-	for (i = 0; i < MSG_SIZE; i++) 
+
+	for(i = 0; i <= sizeof(recv_buffer); i++)
 	{
 		if ((rand() <= error_num) && (rand() % 2 == 0))
 		{
 		 
-			received_buffer[i] ^= 1UL << i;
+			recv_buffer[i] ^= 1UL << i;
+			flipped_count += 1;
 		}
 	}
+
+	ret_val = send_data(recv_buffer, s_recv, recv_addr);
+	if (FAILURE == ret_val)
+	{
+		printf("ERROR - send_string failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+
+	printf("sender: %s\nreceiver: %s\n%d bytes, flipped %d bits", sender_ip_address, recv_ip_address, sizeof(recv_buffer), flipped_count);
 
 CleanUp:
 
@@ -208,7 +218,7 @@ CleanUp:
 		printf("channel_main: Failed to close Winsocket, error %ld.\n", WSAGetLastError());
 	}
 
-
+	//remember to free all alocated data!!!
 
 	return exit_code;
 }
