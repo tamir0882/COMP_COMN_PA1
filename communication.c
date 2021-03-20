@@ -58,6 +58,24 @@ int send_buffer(const char* buffer, int bytes_to_send, SOCKET s_send, SOCKADDR_I
 }
 
 
+//buffer_recv = buffer to store received data
+//buf_size = size of buffer_recv
+//SOCKET s_recv = socket of receiver
+//SOCKADDR_IN sender_addr = address of sender
+
+//for example:
+//int ret_val = 0;
+//ret_val = inet_pton(AF_INET, str_ip_address, &ip_address);
+//	if (1 != ret_val)
+//	{
+//		printf("ERROR - inet_pton failed - has failed.\n");
+//		return FAILURE;
+//	}
+//SOCKADDR_IN sender_addr;
+//sender_addr.sin_family = AF_INET;
+//sender_addr.sin_addr.s_addr = ip_address;
+//sender_addr.sin_port = htons(port_number);
+
 int recv_data(char* buffer_recv, int buf_size, SOCKET s_recv, SOCKADDR_IN sender_addr)
 {
 	if (NULL == buffer_recv)
