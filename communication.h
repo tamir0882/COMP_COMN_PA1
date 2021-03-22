@@ -19,10 +19,7 @@
 #define SUCCESS 0
 #define MSG_END "\r\n\r\n"
 
-
-int send_buffer(const char* buffer, int bytes_to_send, SOCKET communication_socket, SOCKADDR_IN recv_addr);
-
-int send_data(const char* str, SOCKET communication_socket, SOCKADDR_IN recv_addr);
+int send_data(const char* buffer, int bytes_to_send, SOCKET s_send, SOCKADDR_IN recv_addr);
 
 int recv_data(char* buffer_recv, int buf_size, SOCKET s_recv, SOCKADDR_IN *sender_addr);
 
