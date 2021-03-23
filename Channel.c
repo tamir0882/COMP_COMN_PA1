@@ -22,7 +22,7 @@
 #define BASE 2
 #define POWER 16
 #define MSG_SIZE 15
-#define CHUNK_SIZE 15
+#define CHUNK_SIZE 1500
 
 int main(int argc, char* argv[])
 {
@@ -34,192 +34,207 @@ int main(int argc, char* argv[])
 
 	int exit_code = SUCCESS;
 	int ret_val = 0;
-	char recv_ip_address[17] = "";
+	int bytes_recv = 0;
+	int flipped_count = 0;
 	unsigned int error_prob = 0;
 	unsigned int rand_seed = 0;
 	unsigned int channel_port = 0;
 	unsigned int receiver_port = 0;
 	unsigned int error_num = 0;
 	unsigned int prob_den = 0;
-	unsigned int i = 0;
-	int bytes_recv = 0;
+	unsigned int rand_num = 0;
+	char str_recv_ip_address[17] = "";
+	char str_sender_ip_address[17] = "";
 	char* recv_buffer = NULL;
-	char recv_buffer[15] = "";
-	int flipped_count = 0;
+	unsigned long recv_ip_address = 0;
+	
+	
+	SOCKET s_channel = INVALID_SOCKET;
+	SOCKET s_recv = INVALID_SOCKET;
+	SOCKADDR_IN sender_addr = { .sin_addr = 0,.sin_family = 0,.sin_port = 0 };
 
-	recv_buffer = (char*)malloc(sizeof(char) * CHUNK_SIZE);
+
+	recv_buffer = (char*)calloc(CHUNK_SIZE, sizeof(char));
 	if (NULL == recv_buffer)
 	{
-		printf("memory allocation failed for recv_buffer.\n");
+		printf("ERROR in channel main - memory allocation failed for recv_buffer.\n");
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
 
-	ret_val = snprintf(recv_ip_address, 17, "%s", argv[RECV_IP_INDEX]);
+	ret_val = snprintf(str_recv_ip_address, 17, "%s", argv[RECV_IP_INDEX]);
 	if (0 >= ret_val)
 	{
-		fprintf(stderr, "ARGC_COUNT fault, should receive 3 argumets in addition to program.\n");
-		exit(FAILURE);
+		fprintf(stderr, "ERROR in channel main - ARGC_COUNT fault, should receive 3 argumets in addition to program.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
 	}
 
 	channel_port = (unsigned int)strtol(argv[CHANNEL_PORT_INDEX], NULL, 10);
 	if (channel_port == 0)
 	{
-		printf("ERROR in main - strtol for has failed.\n");
-		exit(FAILURE);
+		printf("ERROR in channel main - strtol has failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
 	}
 
 	receiver_port = (unsigned int)strtol(argv[RECV_PORT_INDEX], NULL, 10);
 	if (receiver_port == 0)
 	{
-		printf("ERROR in main - strtol for has failed.\n");
-		exit(FAILURE);
+		printf("ERROR in channel main - strtol has failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
 	}
 
 	error_num = (unsigned int)strtol(argv[ERROR_PROB_INDEX], NULL, 10);
 	if (error_num == 0)
 	{
-		printf("ERROR in main - strtol for has failed.\n");
-		exit(FAILURE);
+		printf("ERROR in channel main - strtol has failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
 	}
 
 	rand_seed = (unsigned int)strtol(argv[SEED_INDEX], NULL, 10);
 	if (rand_seed == 0)
 	{
-		printf("ERROR in main - strtol for has failed.\n");
-		exit(FAILURE);
+		printf("ERROR in channel main - strtol has failed.\n");
+		exit_code = FAILURE;
+		goto CleanUp;
 	}
-
-	error_prob = error_num / pow(BASE, POWER);
 
 	WSADATA wsaData;
 	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (iResult != NO_ERROR)
 	{
-		printf("Error at WSAStartup()\n");
-		exit(FAILURE);
+		printf("ERROR in channel main - Error at WSAStartup()\n");
+		exit_code = FAILURE;
+		goto CleanUp;
 	}
 	
 	// Create a socket to the channel to receive the data
-
-	SOCKET s_channel = socket(AF_INET, SOCK_DGRAM, 0);
+	
+	s_channel = socket(AF_INET, SOCK_DGRAM, 0);
 	
 	if (SOCKET_ERROR == s_channel)
 	{
-		printf("ERROR - failed to create s_sender socket - has failed.\n");
+		printf("ERROR in channel main - failed to create s_channel socket.\n");
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
 	
-	struct sockaddr_in channel_addr;
+	SOCKADDR_IN channel_addr;
 	channel_addr.sin_family = AF_INET;
-	channel_addr.sin_addr.s_addr = INADDR_ANY;
+	channel_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	channel_addr.sin_port = htons(channel_port);
-
-	SOCKADDR_IN channel_addr = { .sin_addr = 0,.sin_family = 0,.sin_port = 0 };
-
-	ret_val = inet_pton(AF_INET, sender_ip_address, &sender_ip_address); ////// GET IP FROM SENDER
-	if (1 != ret_val)
-	{
-		printf("ERROR - inet_pton failed - has failed.\n");
-		exit_code = FAILURE;
-		goto CleanUp;
-	}
-
 
 	// Create a socket to the receiver to send the operated data
 
-	SOCKET s_recv = socket(AF_INET, SOCK_DGRAM, 0);
+	s_recv = socket(AF_INET, SOCK_DGRAM, 0);
 
 	if (SOCKET_ERROR == s_recv)
 	{
-		printf("ERROR - failed to create s_sender socket - has failed.\n");
+		printf("ERROR in channel main - failed to create s_recv socket.\n");
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
 
-	struct sockaddr_in recv_addr;
-	recv_addr.sin_family = AF_INET;
-	recv_addr.sin_addr.s_addr = inet_addr(recv_ip_address);
-	recv_addr.sin_port = htons(channel_port);
-
-	SOCKADDR_IN recv_addr = { .sin_addr = 0,.sin_family = 0,.sin_port = 0 };
-
-	ret_val = inet_pton(AF_INET, recv_ip_address, &recv_ip_address);
+	ret_val = inet_pton(AF_INET, str_recv_ip_address, &recv_ip_address);
 	if (1 != ret_val)
 	{
-		printf("ERROR - inet_pton failed - has failed.\n");
+		printf("ERROR in channel main - inet_pton has failed.\n");
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
 
+	SOCKADDR_IN recv_addr;
+	recv_addr.sin_family = AF_INET;
+	recv_addr.sin_addr.s_addr = recv_ip_address;
+	recv_addr.sin_port = htons(channel_port);
 
 	ret_val = bind(s_channel, (SOCKADDR*)&channel_addr, sizeof(channel_addr));
 	if (ret_val != 0)
 	{
-		printf("bind failed with error %d\n", WSAGetLastError());
+		printf("ERROR in channel main - bind failed with error %d\n", WSAGetLastError());
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
-		
-
-	bytes_recv = recv_data(recv_buffer, sizeof(recv_buffer), s_channel, sender_addr);
-	if (FAILURE == bytes_recv)
-	{
-		printf("ERROR - recv_data failed.\n");
-		exit_code = FAILURE;
-		goto CleanUp;
-	}
-
-
-	prob_den = pow(BASE, POWER);
-	if (error_num >= prob_den || error_num < 0)
-	{
-		error_num %= prob_den;
-	}
-
+	
 	srand(rand_seed);
 	
-
-	for(i = 0; i <= sizeof(recv_buffer); i++)
+	while (1)
 	{
-		if ((rand() <= error_num) && (rand() % 2 == 0))
+		bytes_recv = recv_data(recv_buffer, CHUNK_SIZE, s_channel, &sender_addr);
+		if (FAILURE == bytes_recv)
 		{
-		 
-			recv_buffer[i] ^= 1UL << i;
-			flipped_count += 1;
+			printf("ERROR in channel main - recv_data failed.\n");
+			exit_code = FAILURE;
+			goto CleanUp;
+		}
+
+		for (int i = 0; i < bytes_recv * 8; i++)
+		{
+			rand_num = rand();
+			if (rand() % 2)
+			{
+				rand_num = rand_num*2 + 1;
+			}
+			else
+			{
+				rand_num *= 2;
+			}
+			if (rand_num < error_num)
+			{
+				recv_buffer[i] ^= 1UL << i;
+				flipped_count += 1;
+			}
+		}
+
+		ret_val = send_data(recv_buffer, bytes_recv, s_recv, recv_addr);
+		if (FAILURE == ret_val)
+		{
+			printf("ERROR in channel main - send_string failed.\n");
+			exit_code = FAILURE;
+			goto CleanUp;
 		}
 	}
-
-	ret_val = send_data(recv_buffer, s_recv, recv_addr);
-	if (FAILURE == ret_val)
+		
+	if(NULL == inet_ntop(AF_INET, &sender_addr.sin_addr.s_addr, str_sender_ip_address, sizeof(str_sender_ip_address)))
 	{
-		printf("ERROR - send_string failed.\n");
+		printf("ERROR in channel main - couldn't convert IP address to string.\n");
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
-
-	printf("sender: %s\nreceiver: %s\n%d bytes, flipped %d bits", sender_ip_address, recv_ip_address, sizeof(recv_buffer), flipped_count);
+	
+	fprintf(stderr, "sender: %s\nreceiver: %s\n%d bytes, flipped %d bits", str_sender_ip_address, str_recv_ip_address, sizeof(recv_buffer), flipped_count);
 
 CleanUp:
-
 
 	if (INVALID_SOCKET != s_channel)
 	{
 		if (SOCKET_ERROR == closesocket(s_channel))
 		{
-			printf("channel_main: Failed to close listen_socket, error %ld.\n", WSAGetLastError());
+			printf("ERROR in channel main - Failed to close channel_socket, error %ld.\n", WSAGetLastError());
+		}
+	}
+	
+	if (INVALID_SOCKET != s_recv)
+	{
+		if (SOCKET_ERROR == closesocket(s_recv))
+		{
+			printf("ERROR in channel main - Failed to close receive_socket, error %ld.\n", WSAGetLastError());
 		}
 	}
 
 
 	if (SOCKET_ERROR == WSACleanup())
 	{
-		printf("channel_main: Failed to close Winsocket, error %ld.\n", WSAGetLastError());
+		printf("ERROR in channel main - Failed to close Winsocket, error %ld.\n", WSAGetLastError());
 	}
 
-	//remember to free all alocated data!!!
+	if (NULL != recv_buffer)
+	{
+		free(recv_buffer);
+	}
 
 	return exit_code;
 }
-
