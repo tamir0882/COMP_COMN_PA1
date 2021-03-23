@@ -160,7 +160,9 @@ int main(int argc, char* argv[])
 	}
 	
 	srand(rand_seed);
-	
+
+FromSendertoRecv: ////UNREFERENCED_LABEL - if not being used, delete.
+
 	while (1)
 	{
 		bytes_recv = recv_data(recv_buffer, CHUNK_SIZE, s_channel, &sender_addr);
@@ -206,6 +208,30 @@ int main(int argc, char* argv[])
 	}
 	
 	fprintf(stderr, "sender: %s\nreceiver: %s\n%d bytes, flipped %d bits", str_sender_ip_address, str_recv_ip_address, sizeof(recv_buffer), flipped_count);
+
+
+FromRecvtoSender: ////UNREFERENCED_LABEL - if not being used, delete.
+
+	while (1)
+	{
+		bytes_recv = recv_data(recv_buffer, CHUNK_SIZE, s_recv, &recv_addr);
+		if (FAILURE == bytes_recv)
+		{
+			printf("ERROR in channel main - recv_data failed.\n");
+			exit_code = FAILURE;
+			goto CleanUp;
+		}
+
+		ret_val = send_data(recv_buffer, bytes_recv, s_channel, sender_addr);
+		if (FAILURE == ret_val)
+		{
+			printf("ERROR in channel main - send_string failed.\n");
+			exit_code = FAILURE;
+			goto CleanUp;
+		}
+		closesocket(s_channel);
+	}
+
 
 CleanUp:
 
