@@ -51,11 +51,11 @@ int recv_data(char* buffer_recv, int buf_size, SOCKET s_recv, SOCKADDR_IN* sende
 {
 	if (NULL == buffer_recv)
 	{
+		printf("inside recv_data, buffer_recv was NULL prt.\n");
 		return FAILURE;
 	}
 
 	int recv_bytes = 0;
-	int recv_res = SUCCESS;
 	
 	int send_addr_size = sizeof(*sender_addr);
 
@@ -68,7 +68,7 @@ int recv_data(char* buffer_recv, int buf_size, SOCKET s_recv, SOCKADDR_IN* sende
 		return FAILURE;
 	}
 
-	return recv_res;
+	return recv_bytes;
 }
 
 

@@ -19,7 +19,7 @@
 #define FAILURE -1 
 #define SUCCESS 0
 
-#define CHUNK_SIZE 15
+#define CHUNK_SIZE 1500
 
 int main(int argc, char* argv[])
 {
@@ -32,14 +32,14 @@ int main(int argc, char* argv[])
 
 	int ret_val = 0;
 	int exit_code = SUCCESS;
-\
+
 	int total_byte_count = 0;
 	char* file_data = NULL;
 
-	int bytes_recv = 0;
-	//char* recv_buffer = NULL;
-	char recv_buffer[15] = "";
+	int recv_bytes = 0;
+	char* recv_buffer = NULL;
 
+	int fix_count = 0;
 
 	unsigned long channel_ip_address = 0;
 	char str_channel_ip_address[17] = "";
@@ -50,7 +50,6 @@ int main(int argc, char* argv[])
 	FILE* p_file = NULL;
 
 	SOCKADDR_IN sender_addr = { .sin_addr = 0, .sin_family = 0, .sin_port = 0 };
-	int sender_addr_size = sizeof(sender_addr);
 
 	SOCKADDR_IN recv_addr = { .sin_addr = 0, .sin_family = 0, .sin_port = 0 };
 	SOCKET s_recv = INVALID_SOCKET;
@@ -94,7 +93,7 @@ int main(int argc, char* argv[])
 		goto CleanUp;
 	}
 	
-
+	/*
 	ret_val = inet_pton(AF_INET, "127.0.0.1", &channel_ip_address);
 	if (1 != ret_val)
 	{
@@ -102,12 +101,12 @@ int main(int argc, char* argv[])
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
-
+	*/
 
 
 	recv_addr.sin_family = AF_INET;
-	recv_addr.sin_addr.s_addr = channel_ip_address;
-	//recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	//recv_addr.sin_addr.s_addr = channel_ip_address;
+	recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	recv_addr.sin_port = htons(port_num);
 	
 
@@ -120,29 +119,59 @@ int main(int argc, char* argv[])
 	}
 	
 
-	recv_buffer = (char*)malloc(sizeof(char) * CHUNK_SIZE);
+	ret_val = fopen_s(&p_file, file_name, "wb");
+	if (0 != ret_val || NULL == p_file)
+	{
+		printf("ERROR - failed to open file %s.\n", file_name);
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
+
+	
+	recv_buffer = (char*)calloc(CHUNK_SIZE, sizeof(char));
 	if (NULL == recv_buffer)
 	{
 		printf("memory allocation failed for recv_buffer.\n");
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
-		
-
-	bytes_recv = recv_data(recv_buffer ,s_recv, sender_addr);
-	if (FAILURE == bytes_recv)
+	
+	
+	recv_bytes = recv_data(recv_buffer, CHUNK_SIZE, s_recv, &sender_addr);
+	if (FAILURE == recv_bytes)
 	{
 		printf("ERROR - recv_data failed.\n");
 		exit_code = FAILURE;
 		goto CleanUp;
 	}
 
+	fix_count = decode_str(recv_buffer, &recv_bytes);
 
-	printf("sender sent %s", recv_buffer);
+	printf("sender sent: %s\n", recv_buffer);
 
-
+	ret_val = fwrite(recv_buffer, sizeof(char), recv_bytes, p_file);
+	if (ret_val < recv_bytes)
+	{
+		printf("ERROR - fwrite failure\n");
+		exit_code = FAILURE;
+		goto CleanUp;
+	}
 
 CleanUp:
+
+	if (NULL != recv_buffer)
+	{
+		free(recv_buffer);
+	}
+
+	if (NULL != p_file)
+	{
+		if (0 != fclose(p_file))
+		{
+			printf("could't close file.\n");
+		}
+	}
+
 
 	if (INVALID_SOCKET != s_recv)
 	{
@@ -157,7 +186,6 @@ CleanUp:
 	{
 		printf("server_main: Failed to close Winsocket, error %ld.\n", WSAGetLastError());
 	}
-
 
 
 	return exit_code;

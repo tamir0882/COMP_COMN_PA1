@@ -11,19 +11,12 @@
 #include <ws2tcpip.h>
 
 #include "communication.h"
+#include "Sender_HardCodedData.h"
 
 #pragma comment(lib, "Ws2_32.lib")
 
-#define FAILURE -1
-#define SUCCESS 0
 
 
-
-
-#define IP_ADDR_INDEX 1
-#define PORT_INDEX 2
-#define FILE_INDEX 3
-#define ARGC_COUNT 4
 
 int main(int argc, char* argv[])
 {
@@ -36,9 +29,14 @@ int main(int argc, char* argv[])
 	int ret_val = 0;
 	int exit_code = SUCCESS;
 
+	int bytes_left_to_send = 0;
+	int bytes_sent = 0;
+	int pack_size = 0;
+
 	int bytes_read_from_file = 0;
 	int total_byte_count_file = 0;
 	char* file_data = NULL;
+	char* send_buffer = NULL;
 	int data_buffer_size = 0;
 
 	char c_read = 0;
@@ -109,7 +107,7 @@ int main(int argc, char* argv[])
 		goto CleanUp;
 	}
 
-
+	
 	remote_addr.sin_family = AF_INET;
 	remote_addr.sin_addr.s_addr = channel_ip_address;
 	remote_addr.sin_port = htons(channel_port);
@@ -147,9 +145,9 @@ int main(int argc, char* argv[])
 
 	printf("total byte count is: %d\n", total_byte_count_file);
 
-	data_buffer_size = total_byte_count_file + 1;
+	data_buffer_size = total_byte_count_file * 2;
 
-	file_data = (char*)malloc(sizeof(char) * data_buffer_size);
+	file_data = (char*)calloc(data_buffer_size, sizeof(char));
 	if (NULL == file_data)
 	{
 		printf("ERROR - memory allocation failed for file_data.\n");
@@ -158,30 +156,7 @@ int main(int argc, char* argv[])
 	}
 
 
-	//bytes_read_from_file = fread(file_data, sizeof(char), total_byte_count_file, p_file);
-
-	c_read = fgetc(p_file);
-
-	ret_val = snprintf(file_data, data_buffer_size, "%c", c_read);
-	if (0 >= ret_val)
-	{
-		printf("ERROR - snprintf for file_data - has failed.\n");
-		exit_code = FAILURE;
-		goto CleanUp;
-	}
-
-	for (int i = 1; i < total_byte_count_file; i++)
-	{
-		c_read = fgetc(p_file);
-		ret_val = snprintf(file_data, data_buffer_size, "%s%c", file_data, c_read);
-		if (0 >= ret_val)
-		{
-			printf("ERROR - snprintf for file_data - has failed.\n");
-			exit_code = FAILURE;
-			goto CleanUp;
-		}
-	}
-
+	bytes_read_from_file = fread(file_data, sizeof(char), data_buffer_size, p_file);
 
 	if (bytes_read_from_file != total_byte_count_file)
 	{
@@ -195,6 +170,7 @@ int main(int argc, char* argv[])
 
 
 	printf("successfully read %d bytes from file.\n", bytes_read_from_file);
+
 	printf("file content is: %s\n", file_data);
 
 	/*
@@ -207,13 +183,37 @@ int main(int argc, char* argv[])
 	}
 	*/
 
-	ret_val = send_data(file_data, s_sender, remote_addr);
-	if (FAILURE == ret_val)
+	bytes_left_to_send = bytes_read_from_file;
+
+	send_buffer = file_data;
+
+	while (0 < bytes_left_to_send)
 	{
-		printf("ERROR - send_string failed.\n");
-		exit_code = FAILURE;
-		goto CleanUp;
+		if (BYTES_IN_DEC_STR < bytes_left_to_send)
+		{
+			pack_size = BYTES_IN_DEC_STR;
+		}
+
+		else
+		{
+			pack_size = bytes_left_to_send;
+		}
+
+		ret_val = generate_coded_str(send_buffer, &pack_size);
+
+		bytes_sent = send_data(send_buffer, pack_size, s_sender, remote_addr);
+		if (FAILURE == bytes_sent)
+		{
+			printf("ERROR - send_data failed.\n");
+			exit_code = FAILURE;
+			goto CleanUp;
+		}
+
+		send_buffer += bytes_sent;
+		bytes_left_to_send -= bytes_sent;
 	}
+
+
 
 	//now need to wait for response from receiver about how many errors he detected.
 
